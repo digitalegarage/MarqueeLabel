@@ -358,6 +358,12 @@ open class MarqueeLabel: UILabel, CAAnimationDelegate {
             return duration
         }
     }
+
+	/** Another MarqueeLabel instance that this label will stay in sync with. This means if it has to scroll,
+		it will wait for the other label to finish scrolling (if necessary) and start its animation in sync with the other
+		one. If the other label can fit all its text in the available width this label acts like a normal MarqueeLabel instance.
+	*/
+	public weak var syncLabel: MarqueeLabel?
     
     //
     // MARK: - Class Functions and Helpers
@@ -796,6 +802,8 @@ open class MarqueeLabel: UILabel, CAAnimationDelegate {
         
         // Remove completion block
         scrollCompletionBlock = nil
+
+				isWaiting = false
     }
     
     private func beginScroll(_ sequence: [MarqueeStep]) {
@@ -879,7 +887,23 @@ open class MarqueeLabel: UILabel, CAAnimationDelegate {
                 return
             }
             
-            // Begin again, if conditions met
+
+					// if there is another label waiting for us to finish, notify it to start
+					if let otherLabel = self?.syncLabel {
+						if otherLabel.isWaiting {
+							otherLabel.isWaiting = false
+							otherLabel.triggerScrollStart()
+						}
+
+						// if other label is in motion, we wait for it to finish
+						if otherLabel.awayFromHome {
+							self?.isWaiting = true
+							return
+						}
+					}
+
+					// Begin again, if conditions met
+
             if self!.labelShouldScroll() && !self!.tapToScroll && !self!.holdScrolling {
                 // Perform completion callback
                 self!.scroll(scroller, fader: fader)
@@ -1167,6 +1191,8 @@ open class MarqueeLabel: UILabel, CAAnimationDelegate {
     }
     
     fileprivate var scrollCompletionBlock: MLAnimationCompletionBlock?
+
+		fileprivate var isWaiting: Bool = false
     
     override open func draw(_ layer: CALayer, in ctx: CGContext) {
         // Do NOT call super, to prevent UILabel superclass from drawing into context
